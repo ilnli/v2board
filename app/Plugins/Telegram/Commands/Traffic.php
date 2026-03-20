@@ -2,8 +2,10 @@
 
 namespace App\Plugins\Telegram\Commands;
 
+use App\Models\Plan;
 use App\Models\User;
 use App\Plugins\Telegram\Telegram;
+use App\Services\UserService;
 use App\Utils\Helper;
 
 class Traffic extends Telegram {
@@ -18,11 +20,23 @@ class Traffic extends Telegram {
             $telegramService->sendMessage($message->chat_id, '没有查询到您的用户信息，请先绑定账号', 'markdown');
             return;
         }
+
         $transferEnable = Helper::trafficConvert($user->transfer_enable);
         $up = Helper::trafficConvert($user->u);
         $down = Helper::trafficConvert($user->d);
         $remaining = Helper::trafficConvert($user->transfer_enable - ($user->u + $user->d));
-        $text = "🚥流量查询\n———————————————\n计划流量：`{$transferEnable}`\n已用上行：`{$up}`\n已用下行：`{$down}`\n剩余流量：`{$remaining}`";
+
+        $plan = $user->plan_id ? Plan::find($user->plan_id) : null;
+        $planName = $plan ? $plan->name : '无套餐';
+        $expiredAt = $user->expired_at ? date('Y-m-d H:i:s', $user->expired_at) : '长期有效';
+        $resetDay = null;
+        if ($plan) {
+            $user->plan = $plan;
+            $resetDay = (new UserService())->getResetDay($user);
+        }
+        $resetDayText = $resetDay !== null ? $resetDay . ' 天后' : '无重置';
+
+        $text = "🚥流量查询\n———————————————\n套餐名称：`{$planName}`\n到期时间：`{$expiredAt}`\n流量重置：`{$resetDayText}`\n———————————————\n计划流量：`{$transferEnable}`\n已用上行：`{$up}`\n已用下行：`{$down}`\n剩余流量：`{$remaining}`";
         $telegramService->sendMessage($message->chat_id, $text, 'markdown');
     }
 }
